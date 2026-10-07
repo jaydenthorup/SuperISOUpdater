@@ -38,4 +38,4 @@ jobs:
         $exe = "dist\sisou.exe"
         $asset_name = "sisou-$tag-win64.exe"
         Rename-Item $exe $asset_name
-        gh release upload $tag $asset_name --clobber
+        gh release upload $tag "dist\$asset_name" --clobber
