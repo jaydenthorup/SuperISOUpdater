@@ -1,0 +1,41 @@
+# Build Windows executable with PyInstaller on release
+name: Build Windows Executable
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+
+    - name: Build executable
+      run: |
+        python -m PyInstaller sisou.spec
+
+    - name: Upload release asset
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        $tag = "${{ github.event.release.tag_name }}"
+        $exe = "dist\sisou.exe"
+        $asset_name = "sisou-$tag-win64.exe"
+        Rename-Item $exe $asset_name
+        gh release upload $tag $asset_name --clobber
