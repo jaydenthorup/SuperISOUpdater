@@ -1,62 +1,75 @@
+from .AlpineLinux import AlpineLinux
 from .ArchLinux import ArchLinux
-from .ChromeOS import ChromeOS
+from .ArtixLinux import ArtixLinux
+from .CachyOS import CachyOS
 from .Clonezilla import Clonezilla
 from .Debian import Debian
+from .Edubuntu import Edubuntu
+from .EndeavourOS import EndeavourOS
 from .Fedora import Fedora
-from .FreeDOS import FreeDOS
+from .FreeBSD import FreeBSD
 from .GenericUpdater import GenericUpdater
 from .GPartedLive import GPartedLive
 from .HDAT2 import HDAT2
 from .HirensBootCDPE import HirensBootCDPE
 from .KaliLinux import KaliLinux
+from .Kubuntu import Kubuntu
 from .LinuxMint import LinuxMint
+from .LMDE import LMDE
+from .Lubuntu import Lubuntu
 from .Manjaro import Manjaro
 from .MemTest86Plus import MemTest86Plus
-from .OpenSUSE import OpenSUSE
-from .OpenSUSERolling import OpenSUSERolling
+from .MXLinux import MXLinux
+from .NetBSD import NetBSD
 from .OPNsense import OPNsense
 from .Proxmox import Proxmox
 from .Rescuezilla import Rescuezilla
 from .RockyLinux import RockyLinux
+from .RockyLinuxLive import RockyLinuxLive
 from .ShredOS import ShredOS
-from .SuperGrub2 import SuperGrub2
 from .SystemRescue import SystemRescue
 from .Tails import Tails
-from .TempleOS import TempleOS
 from .TrueNAS import TrueNAS
 from .Ubuntu import Ubuntu
 from .UltimateBootCD import UltimateBootCD
-from .Windows10 import Windows10
 from .Windows11 import Windows11
+from .Xubuntu import Xubuntu
 
 __all__ = [
-    "ArchLinux",
-    "Debian",
-    "ChromeOS",
-    "Clonezilla",
-    "Fedora",
-    "FreeDOS",
-    "GenericUpdater",
-    "GPartedLive",
     "HDAT2",
-    "ShredOS",
+    "LMDE",
+    "AlpineLinux",
+    "ArchLinux",
+    "ArtixLinux",
+    "CachyOS",
+    "Clonezilla",
+    "Debian",
+    "Edubuntu",
+    "EndeavourOS",
+    "Fedora",
+    "FreeBSD",
+    "GPartedLive",
+    "GenericUpdater",
     "HirensBootCDPE",
     "KaliLinux",
+    "Kubuntu",
     "LinuxMint",
+    "Lubuntu",
+    "MXLinux",
     "Manjaro",
     "MemTest86Plus",
-    "OpenSUSE",
-    "OpenSUSERolling",
+    "NetBSD",
     "OPNsense",
-    "RockyLinux",
-    "Tails",
+    "Proxmox",
     "Rescuezilla",
-    "SuperGrub2",
+    "RockyLinux",
+    "RockyLinuxLive",
+    "ShredOS",
     "SystemRescue",
-    "TempleOS",
+    "Tails",
+    "TrueNAS",
     "Ubuntu",
     "UltimateBootCD",
-    "TrueNAS",
-    "Windows10",
     "Windows11",
+    "Xubuntu",
 ]

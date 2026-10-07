@@ -1,0 +1,18 @@
+from modules.GitHubVersion import GitHubVersion
+from modules.mirrors.GitHubMirror import GitHubMirror
+from modules.Version import Version
+
+
+class GitHub(GitHubMirror):
+    def __init__(self, edition: str, arch: str) -> None:
+        super().__init__(
+            repository="rescuezilla/rescuezilla",
+            download_regex=rf"rescuezilla-.+-{arch}.{edition}.iso",
+            determine_version_using=GitHubVersion.TAG,
+            has_signature=False,
+            version_regex=r"(.+)",
+        )
+
+    def _determine_latest_version(self) -> Version:
+        self.github_info = [release for release in self.github_info if "rolling" not in release["tag_name"]]
+        return super()._determine_latest_version()

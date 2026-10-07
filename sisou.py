@@ -1,17 +1,21 @@
 import argparse
+import importlib.metadata
 import logging
+import os
+import shutil
 from abc import ABCMeta
 from functools import cache
+from itertools import product
 from pathlib import Path
-from typing import Type
 
 import modules.updaters
+from modules.SISOUConfig import SISOUConfig
 from modules.updaters import GenericUpdater
-from modules.utils import parse_config
+from modules.utils import format_size
 
 
 @cache
-def get_available_updaters() -> list[Type[GenericUpdater]]:
+def get_available_updaters() -> list[type[GenericUpdater]]:
     """Get a list of available updaters.
 
     Returns:
@@ -36,12 +40,11 @@ def setup_logging(log_level: str, log_file: Path | None):
     Raises:
         ValueError: If the log_level is invalid.
     """
-    numeric_log_level = getattr(logging, log_level, None)
-
     logging.basicConfig(
-        level=numeric_log_level,
+        level=log_level,
         format="%(asctime)s - %(levelname)s - %(message)s",
         filename=log_file,
+        force=True,
     )
 
     logging.debug("Logging started")
@@ -53,84 +56,64 @@ def run_updater(updater: GenericUpdater):
     Args:
         updater (GenericUpdater): The updater instance to run.
     """
-    installer_for = f"{updater.__class__.__name__}{' '+updater.edition if updater.has_edition() else ''}"  # type: ignore
+    installer_for = (
+        f"{updater.__class__.__name__}{' ' + updater.edition if updater.edition else ''}"
+        f"{' ' + updater.lang if updater.lang else ''}{' ' + updater.arch if updater.arch else ''}"
+    )
 
     logging.info(f"[{installer_for}] Checking for updates...")
 
     try:
-        if updater.check_for_updates():
+        if updater.is_update_available():
             logging.info(
-                f"[{installer_for}] Updates available. Downloading and installing the latest version..."
+                f"[{installer_for}] Update available. "
+                f"Updating from version {updater._get_local_version()} to {updater._get_latest_version()}..."
             )
+            old_size = local_file.stat().st_size if (local_file := updater._get_local_file()) else 0
             updater.install_latest_version()
-            logging.info(f"[{installer_for}] Update completed successfully!")
+            new_size = local_file.stat().st_size if (local_file := updater._get_local_file()) else 0
+            diff_size = new_size - old_size
+            logging.info(
+                f"[{installer_for}] Update completed successfully! "
+                f"({'-' if diff_size < 0 else '+'}{format_size(abs(diff_size))})"
+            )
         else:
             logging.info(f"[{installer_for}] No updates available.")
-    except:
-        logging.exception(
-            f"[{installer_for}] An error occurred while updating. See traceback below."
-        )
+    except Exception:
+        logging.exception(f"[{installer_for}] An error occurred while updating. See traceback below.")
 
 
-def run_updaters(
-    install_path: Path, config: dict, updater_list: list[Type[GenericUpdater]]
-):
-    """Run updaters based on the provided configuration.
+def create_and_run_updaters(config: SISOUConfig) -> None:
+    for iso_config in config:
+        editions = iso_config.editions or [None]
+        langs = iso_config.langs or [None]
+        archs = iso_config.archs or [None]
 
-    Args:
-        install_path (Path): The installation path.
-        config (dict): The configuration dictionary.
-        updater_list (list[Type[GenericUpdater]]): A list of available updater classes.
-    """
-    for key, value in config.items():
-        # If the key's name is the name of an updater, run said updater using the values as argument, otherwise assume it's a folder's name
-        if key in [updater.__name__ for updater in updater_list]:
-            updater_class = next(
-                updater for updater in updater_list if updater.__name__ == key
+        for edition, lang, arch in product(editions, langs, archs):
+            installer_for = (
+                f"{iso_config.updater.__name__}{' ' + edition if edition else ''}"
+                f"{' ' + lang if lang else ''}{' ' + arch if arch else ''}"
             )
-
-            updaters: list[GenericUpdater] = []
-
-            params: list[dict] = [{}]
-
-            editions = value.get("editions", [])
-            langs = value.get("langs", [])
-
-            if editions and langs:
-                params = [
-                    {"edition": edition, "lang": lang}
-                    for edition in editions
-                    for lang in langs
-                ]
-            elif editions:
-                params = [{"edition": edition} for edition in editions]
-            elif langs:
-                params = [{"lang": lang} for lang in langs]
-
-            for param in params:
-                try:
-                    updaters.append(updater_class(install_path, **param))
-                except Exception:
-                    installer_for = f"{key} {param}"
-                    logging.exception(
-                        f"[{installer_for}] An error occurred while trying to add the installer. See traceback below."
-                    )
-            # Run updater(s)
-            for updater in updaters:
-                run_updater(updater)
-
-        else:
-            run_updaters(install_path / key, value, updater_list)
+            try:
+                updater_instance = iso_config.updater(
+                    iso_path=iso_config.iso_path,
+                    arch=arch,
+                    edition=edition,
+                    lang=lang,
+                )  # type: ignore // We don't pass a mirror_mgr parameter to child classes of GenericUpdater
+            except Exception:
+                logging.exception(f"[{installer_for}] An error occurred while updating. See traceback below.")
+                continue
+            run_updater(updater_instance)
 
 
 def main():
     """Main function to run the update process."""
     parser = argparse.ArgumentParser(description="Process a file and set log level")
-
-    # Add the positional argument for the file path
-    parser.add_argument("ventoy_path", help="Path to the Ventoy drive")
-
-    # Add the optional argument for log level
+    parser.add_argument(
+        "config_path",
+        help="Path to the configuration file or directory containing sisou.toml",
+    )
     parser.add_argument(
         "-l",
         "--log-level",
@@ -138,61 +121,34 @@ def main():
         default="INFO",
         help="Set the log level (default: INFO)",
     )
-
-    # Add the optional argument for log file
+    parser.add_argument("-f", "--log-file", help="Path to the log file (default: log to console)")
     parser.add_argument(
-        "-f", "--log-file", help="Path to the log file (default: log to console)"
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {importlib.metadata.version('sisou')}",
     )
-
-    # Add the optional argument for config file
-    parser.add_argument(
-        "-c", "--config-file", help="Path to the config file (default: config.toml)"
-    )
-
     args = parser.parse_args()
 
     log_file = Path(args.log_file) if args.log_file else None
     setup_logging(args.log_level, log_file)
 
-    ventoy_path = Path(args.ventoy_path).resolve()
+    config_path = args.config_path
 
-    config_file = Path(args.config_file) if args.config_file else None
-    if not config_file:
-        logging.info(
-            "No config file specified. Trying to find config.toml in the current directory..."
-        )
-        config_file = Path() / "config.toml"
+    if os.path.isdir(config_path):
+        config_path = os.path.join(config_path, "sisou.toml")
 
-        if not config_file.is_file():
-            logging.info(
-                "No config file specified. Trying to find config.toml in the ventoy drive..."
-            )
-            config_file = ventoy_path / "config.toml"
+    if not os.path.exists(config_path):
+        default_config_path = os.path.join(os.path.dirname(__file__), "config", "sisou.toml.default")
+        shutil.copyfile(default_config_path, config_path)
+        logging.info(f"No config file found. A default config file has been created at: {config_path}")
+        return
 
-            if not config_file.is_file():
-                logging.info(
-                    "No config.toml found in the ventoy drive. Generating one from config.toml.default..."
-                )
-                with open(
-                    Path(__file__).parent / "config" / "config.toml.default"
-                ) as default_config_file:
-                    config_file.parent.mkdir(parents=True, exist_ok=True)
-                    with open(config_file, "w") as new_config_file:
-                        new_config_file.write(default_config_file.read())
-                logging.info(
-                    "Generated config.toml in the ventoy drive. Please edit it to your liking and run sisou again."
-                )
-                return
+    os.chdir(os.path.dirname(config_path))
+    logging.info(f"Using config file: {config_path}")
 
-    config = parse_config(config_file)
-    if not config:
-        raise ValueError("Configuration file could not be parsed or is empty")
-
-    available_updaters: list[Type[GenericUpdater]] = get_available_updaters()
-
-    run_updaters(ventoy_path, config, available_updaters)
-
-    logging.debug("Finished execution")
+    config = SISOUConfig(config_path)
+    create_and_run_updaters(config)
 
 
 if __name__ == "__main__":

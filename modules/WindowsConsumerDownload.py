@@ -2,6 +2,7 @@ import logging
 import re
 import uuid
 from datetime import datetime
+from typing import ClassVar
 
 import requests
 
@@ -15,16 +16,18 @@ class WindowsConsumerDownloader:
     _PROFILE_ID = "606624d44113"
     _ORG_ID = "y6jn8c31"
 
-    _HEADERS = {
+    _HEADERS: ClassVar[dict[str, str]] = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "referer": "localhost",
     }
 
+    TIMEOUT = 30
+
     _session_authorized = False
-    _download_page_cache = {}
-    _language_skuIDs_cache = {}
-    _download_link_cache = {}
+    _download_page_cache = {}  # noqa: RUF012
+    _language_skuIDs_cache = {}  # noqa: RUF012
+    _download_link_cache = {}  # noqa: RUF012
 
     @staticmethod
     def windows_consumer_file_hash(windows_version: str, lang: str) -> str:
@@ -32,52 +35,45 @@ class WindowsConsumerDownloader:
         Obtain a Windows ISO download URL for a specific Windows version and language.
 
         Args:
-            windows_version (str): The desired Windows version. Valid options are '11', '10', or '8'.
-                                Default is '11'.
-            lang (str): The desired language for the Windows ISO. Default is 'English International'.
-                See https://www.microsoft.com/en-us/software-download/windows11 for a list of available languages
+            windows_version (str): The desired Windows version.
+            lang (str): The desired language for the Windows ISO.
 
         Returns:
             str: Download link for the given Windows version and language
         """
         matches = re.search(
-            rf"FileHash(.+\n+)+?^<\/tr>.+{lang}.+\n<td>(.+)<",
+            rf"colgroup.+?{lang} 64.+?([A-F0-9]{{64}})",
             WindowsConsumerDownloader._get_download_page(windows_version),
-            re.MULTILINE,
+            re.DOTALL,
         )
 
         if not matches or not matches.groups():
             raise LookupError("Could not find SHA256 hash")
 
-        file_hash = matches.group(2)
+        file_hash = matches.group(1)
         return file_hash
 
     @staticmethod
     def _get_download_page(windows_version: str) -> str:
         match windows_version:
-            case "11":
+            case "11" | "11arm64":
                 url_segment = f"windows{windows_version}"
             case "10" | "8":
                 url_segment = f"windows{windows_version}ISO"
             case _:
-                raise NotImplementedError(
-                    "The valid Windows versions are '11', '10', or '8'."
-                )
+                raise NotImplementedError("The valid Windows versions are '11', '11arm64', '10', or '8'.")
 
-        if not url_segment in WindowsConsumerDownloader._download_page_cache:
+        if url_segment not in WindowsConsumerDownloader._download_page_cache:
             download_page = requests.get(
                 f"https://www.microsoft.com/en-us/software-download/{url_segment}",
                 headers=WindowsConsumerDownloader._HEADERS,
+                timeout=WindowsConsumerDownloader.TIMEOUT,
             )
 
             if download_page.status_code != 200:
-                raise RuntimeError(
-                    f"Could not load the Windows {windows_version} download page."
-                )
+                raise RuntimeError(f"Could not load the Windows {windows_version} download page.")
 
-            WindowsConsumerDownloader._download_page_cache[url_segment] = (
-                download_page.text
-            )
+            WindowsConsumerDownloader._download_page_cache[url_segment] = download_page.text
 
         return WindowsConsumerDownloader._download_page_cache[url_segment]
 
@@ -103,13 +99,12 @@ class WindowsConsumerDownloader:
             raise LookupError("Could not find product edition id")
 
         product_edition_id = matches.group(1)
-        logging.debug(
-            f"[windows_consumer_download] Product edition id: `{product_edition_id}`"
-        )
+        logging.debug(f"[windows_consumer_download] Product edition id: `{product_edition_id}`")
 
         if not WindowsConsumerDownloader._session_authorized:
             requests.get(
-                f"https://vlscppe.microsoft.com/tags?org_id={WindowsConsumerDownloader._ORG_ID}&session_id={WindowsConsumerDownloader._SESSION_ID}"
+                f"https://vlscppe.microsoft.com/tags?org_id={WindowsConsumerDownloader._ORG_ID}&session_id={WindowsConsumerDownloader._SESSION_ID}",
+                timeout=WindowsConsumerDownloader.TIMEOUT,
             )
             WindowsConsumerDownloader._session_authorized = True
 
@@ -118,31 +113,28 @@ class WindowsConsumerDownloader:
                 "https://www.microsoft.com/software-download-connector/api/getskuinformationbyproductedition"
                 + f"?profile={WindowsConsumerDownloader._PROFILE_ID}"
                 + f"&productEditionId={product_edition_id}"
-                + f"&SKU=undefined"
-                + f"&friendlyFileName=undefined"
-                + f"&Locale=en-US"
+                + "&SKU=undefined"
+                + "&friendlyFileName=undefined"
+                + "&Locale=en-US"
                 + f"&sessionID={WindowsConsumerDownloader._SESSION_ID}"
             )
 
             language_skuIDs = requests.get(
-                language_skuIDs_url, headers=WindowsConsumerDownloader._HEADERS
+                language_skuIDs_url,
+                headers=WindowsConsumerDownloader._HEADERS,
+                timeout=WindowsConsumerDownloader.TIMEOUT,
             ).json()
-            if not "Skus" in language_skuIDs:
+            if "Skus" not in language_skuIDs:
                 raise ValueError("Could not find SKU IDs")
 
-            WindowsConsumerDownloader._language_skuIDs_cache[product_edition_id] = (
-                language_skuIDs
-            )
+            WindowsConsumerDownloader._language_skuIDs_cache[product_edition_id] = language_skuIDs
 
-        language_skuIDs = WindowsConsumerDownloader._language_skuIDs_cache[
-            product_edition_id
-        ]
+        language_skuIDs = WindowsConsumerDownloader._language_skuIDs_cache[product_edition_id]
 
-        sku_id = None
-
-        for sku in language_skuIDs["Skus"]:
-            if sku["Language"] == lang:
-                sku_id = sku["Id"]
+        sku_id = next(
+            (sku["Id"] for sku in language_skuIDs["Skus"] if sku["Language"] == lang),
+            None,
+        )
 
         if not sku_id:
             raise ValueError(f"The language '{lang}' for Windows could not be found!")
@@ -151,8 +143,7 @@ class WindowsConsumerDownloader:
 
         if (
             sku_id not in WindowsConsumerDownloader._download_link_cache
-            or datetime.now()
-            < WindowsConsumerDownloader._download_link_cache[sku_id]["expires"]
+            or datetime.now() < WindowsConsumerDownloader._download_link_cache[sku_id]["expires"]
         ):
             # Get ISO download link page
             iso_download_link_page = (
@@ -161,24 +152,32 @@ class WindowsConsumerDownloader:
                 + "&productEditionId=undefined"
                 + f"&SKU={sku_id}"
                 + "&friendlyFileName=undefined"
-                + f"&Locale=en-US"
+                + "&Locale=en-US"
                 + f"&sessionID={WindowsConsumerDownloader._SESSION_ID}"
             )
 
             iso_download_link_json = requests.get(
-                iso_download_link_page, headers=WindowsConsumerDownloader._HEADERS
+                iso_download_link_page,
+                headers=WindowsConsumerDownloader._HEADERS,
+                timeout=WindowsConsumerDownloader.TIMEOUT,
             ).json()
 
             if "Errors" in iso_download_link_json:
-                raise RuntimeError(
-                    f"Errors from Microsoft: {iso_download_link_json['Errors']}"
-                )
+                raise RuntimeError(f"Errors from Microsoft: {iso_download_link_json['Errors']}")
+            uri = ""
+            arch = "rm64" if "arm64" in windows_version.lower() else "x64"
+            for download_option in iso_download_link_json["ProductDownloadOptions"]:
+                if arch in download_option["Uri"]:
+                    uri = download_option["Uri"]
+                    break
+            if not uri:
+                raise RuntimeError(f"Could not find a {arch} download.")
             WindowsConsumerDownloader._download_link_cache[sku_id] = {
                 "expires": datetime.strptime(
                     iso_download_link_json["DownloadExpirationDatetime"][:-2],
                     "%Y-%m-%dT%H:%M:%S.%f",
                 ),
-                "link": iso_download_link_json["ProductDownloadOptions"][0]["Uri"],
+                "link": uri,
             }
 
         download_link = WindowsConsumerDownloader._download_link_cache[sku_id]["link"]

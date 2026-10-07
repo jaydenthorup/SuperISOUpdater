@@ -1,0 +1,324 @@
+directory = "."
+
+# Diagnostic Tools
+
+[DiagnosticTools]
+enabled = true
+directory = "Diagnostic_Tools"
+
+[DiagnosticTools.HirensBootCDPE]
+enabled = true
+# Available architectures:
+# "x64"
+archs = ["x64"]
+name = "HBCD_PE_[[VER]]_[[ARCH]]"
+
+[DiagnosticTools.MemTest86Plus]
+enabled = true
+# Available architectures:
+# "x86_64", "i586"
+archs = ["x86_64"]
+name = "mt86plus_[[VER]]_[[ARCH]]"
+
+[DiagnosticTools.SystemRescue]
+enabled = true
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "systemrescue-[[VER]]-[[ARCH]]"
+
+[DiagnosticTools.UltimateBootCD]
+enabled = true
+name = "ubcd[[VER]]"
+
+# Disk Utilities
+
+[DiskUtils]
+enabled = true
+directory = "Disk_Utilities"
+
+[DiskUtils.Clonezilla]
+enabled = true
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "clonezilla-live-[[VER]]-[[ARCH]]"
+
+[DiskUtils.GPartedLive]
+enabled = true
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "gparted-live-[[VER]]-[[ARCH]]"
+
+[DiskUtils.HDAT2]
+enabled = true
+# Available editions:
+# "full", "lite", "diskette"
+editions = ["full"]
+name = "hdat2_[[EDITION]]_[[VER]]"
+
+[DiagnosticTools.Rescuezilla]
+enabled = true
+# Available editions:
+# "noble", "resolute"
+editions = ["resolute"]
+# Available architectures:
+# "64bit"
+archs = ["64bit"]
+name = "rescuezilla-[[VER]]-[[ARCH]].[[EDITION]]"
+
+[DiskUtils.ShredOS]
+enabled = true
+# Available architectures:
+# "x86-64", "i686"
+archs = ["x86-64"]
+name = "shredos-[[VER]]_[[ARCH]]"
+
+# Operating Systems
+
+[OperatingSystems]
+enabled = true
+directory = "Operating_Systems"
+
+# Linux
+[OperatingSystems.Linux]
+enabled = true
+directory = "Linux"
+
+[OperatingSystems.Linux.AlpineLinux]
+enabled = true
+# Available editions:
+# "standard"
+editions = ["standard"]
+# Available architectures:
+# "aarch64", "armv7", "loongarch64", "ppc64le", "riscv64", "s390x", "x86", "x86_64"
+archs = ["x86_64"]
+name = "alpine-[[EDITION]]-[[VER]]-[[ARCH]]"
+
+[OperatingSystems.Linux.ArchLinux]
+enabled = true
+# Available architectures:
+# "x86_64"
+archs = ["x86_64"]
+name = "archlinux-[[VER]]-[[ARCH]]"
+
+[OperatingSystems.Linux.ArtixLinux]
+enabled = true
+# Available editions:
+# "base-dinit", "base-openrc", "base-runit", "base-s6",
+# "cinnamon-dinit", "cinnamon-openrc", "cinnamon-runit", "cinnamon-s6",
+# "lxde-dinit", "lxde-openrc", "lxde-runit", "lxde-s6",
+# "lxqt-dinit", "lxqt-openrc", "lxqt-runit", "lxqt-s6",
+# "mate-dinit", "mate-openrc", "mate-runit", "mate-s6",
+# "plasma-dinit", "plasma-openrc", "plasma-runit", "plasma-s6",
+# "xfce-dinit", "xfce-openrc", "xfce-runit", "xfce-s6"
+editions = ["base-openrc"]
+# Available architectures:
+# "x86_64"
+archs = ["x86_64"]
+name = "artix-[[EDITION]]-[[VER]]-[[ARCH]]"
+
+[OperatingSystems.Linux.CachyOS]
+enabled = true
+# Available editions:
+# "desktop", "handheld"
+editions = ["desktop"]
+name = "cachyos-[[EDITION]]-linux-[[VER]]"
+
+[OperatingSystems.Linux.Debian]
+enabled = true
+# Available architectures:
+# "amd64", "arm64", "armhf", "ppc64el", "riscv64", "s390x"
+archs = ["amd64"]
+name = "debian-live-[[VER]]-[[ARCH]]-netinst"
+
+[OperatingSystems.Linux.EndeavourOS]
+enabled = true
+name = "EndeavourOS_[[VER]]"
+
+[OperatingSystems.Linux.Fedora]
+enabled = true
+# Available editions:
+# "Everything", "KDE", "Kinoite", "Server", "Silverblue", "Workstation",
+# "Spins/COSMIC", "Spins/KDE-Mobile", "Spins/LXQt", "Spins/MiracleWM", "Spins/SoaS", "Spins/Xfce", "Spins/i3"
+editions = ["KDE"]
+# Available architectures:
+# "aarch64", "x86_64"
+archs = ["x86_64"]
+name = "Fedora-[[EDITION]]-Live-[[VER]].[[ARCH]]"
+
+[OperatingSystems.Linux.KaliLinux]
+enabled = true
+# Available editions:
+# "installer", "installer-everything", "installer-netinst", "installer-purple", "live"
+editions = ["installer", "live"]
+# Available architectures:
+# "amd64", "arm64"
+archs = ["amd64"]
+name = "kali-linux-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+[OperatingSystems.Linux.LinuxMint]
+enabled = true
+# Available editions:
+# "cinnamon", "mate", "xfce"
+editions = ["cinnamon"]
+name = "linuxmint-[[VER]]-[[EDITION]]-64bit"
+
+[OperatingSystems.Linux.LMDE]
+enabled = true
+# Available editions:
+# "cinnamon"
+editions = ["cinnamon"]
+name = "lmde-[[VER]]-[[EDITION]]-64bit"
+
+[OperatingSystems.Linux.Manjaro]
+enabled = true
+# Available editions:
+# "kde", "xfce", "gnome", "cinnamon", "i3"
+editions = ["kde"]
+name = "manjaro-[[EDITION]]-[[VER]]-linux"
+
+[OperatingSystems.Linux.MXLinux]
+enabled = true
+# Available editions:
+# "Xfce", "Xfce_ahs", "KDE", "Fluxbox"
+editions = ["Xfce"]
+# Available architectures:
+# "x64"
+archs = ["x64"]
+name = "MX-[[VER]]_[[EDITION]]_[[ARCH]]"
+
+[OperatingSystems.Linux.Proxmox]
+enabled = true
+# Available editions:
+# "ve", "mail-gateway", "backup-server", "datacenter-manager"
+editions = ["ve"]
+name = "proxmox-[[EDITION]]_[[VER]]"
+
+[OperatingSystems.Linux.RockyLinux]
+enabled = true
+# Available editions:
+# "dvd", "boot", "minimal"
+editions = ["dvd"]
+# Available architectures:
+# "x86_64", "aarch64", "ppc64le", "s390x", "riscv64"
+archs = ["x86_64"]
+name = "Rocky-[[VER]]-[[ARCH]]-[[EDITION]]"
+
+[OperatingSystems.Linux.RockyLinuxLive]
+enabled = true
+# Available editions:
+# "KDE", "Workstation", "Workstation-Lite"
+editions = ["KDE"]
+# Available architectures:
+# "x86_64", "aarch64"
+archs = ["x86_64"]
+name = "Rocky-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+[OperatingSystems.Linux.TrueNAS]
+enabled = true
+name = "TrueNAS-SCALE-[[VER]]"
+
+[OperatingSystems.Linux.Tails]
+enabled = true
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "tails-[[ARCH]]-[[VER]]"
+
+[OperatingSystems.Linux.Ubuntu]
+enabled = true
+# Available editions:
+# "desktop", "live-server"
+editions = ["desktop"]
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "ubuntu-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+[OperatingSystems.Linux.Edubuntu]
+enabled = true
+# Available editions:
+# "desktop"
+editions = ["desktop"]
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "edubuntu-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+[OperatingSystems.Linux.Kubuntu]
+enabled = true
+# Available editions:
+# "desktop"
+editions = ["desktop"]
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "kubuntu-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+[OperatingSystems.Linux.Lubuntu]
+enabled = true
+# Available editions:
+# "desktop"
+editions = ["desktop"]
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "lubuntu-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+[OperatingSystems.Linux.Xubuntu]
+enabled = true
+# Available editions:
+# "desktop", "minimal"
+editions = ["desktop"]
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "xubuntu-[[VER]]-[[EDITION]]-[[ARCH]]"
+
+# Windows
+[OperatingSystems.Windows]
+enabled = true
+directory = "Windows"
+
+[OperatingSystems.Windows.Windows11]
+enabled = true
+# Available languages:
+# "Arabic", "Brazilian Portuguese", "Bulgarian", "Chinese", "Chinese", "Croatian", "Czech", "Danish", "Dutch", "English", "English International", "Estonian", "Finnish", "French", "French Canadian", "German", "Greek", "Hebrew", "Hungarian", "Italian", "Japanese", "Korean", "Latvian", "Lithuanian", "Norwegian", "Polish", "Portuguese", "Romanian", "Russian", "Serbian Latin", "Slovak", "Slovenian", "Spanish", "Spanish (Mexico)", "Swedish", "Thai", "Turkish", "Ukrainian"
+langs = ["English International"]
+# Available architectures:
+# "x64", "Arm64"
+archs = ["x64"]
+name = "Win11_[[VER]]_[[LANG]]_[[ARCH]]"
+
+[OperatingSystems.BSD]
+enabled = true
+directory = "BSD"
+
+[OperatingSystems.BSD.FreeBSD]
+enabled = true
+# Available editions:
+# "bootonly", "dvd1", "disc1"
+editions = ["dvd1"]
+# Available architectures:
+# "amd64", "aarch64", "powerpc64", "powerpc64le", "riscv64"
+archs = ["amd64"]
+name = "FreeBSD-[[VER]]-RELEASE-[[ARCH]]-[[EDITION]]"
+
+[OperatingSystems.BSD.NetBSD]
+enabled = true
+# Available architectures:
+# "amd64", "evbarm-aarch64", "evbarm-aarch64eb", "evbmips-mips64eb", "evbmips-mips64el", "evbmips-mipseb", "evbmips-mipsel", "evbmips-mipsn64eb", "evbmips-mipsn64el", "evbppc", "hpcarm", "i386", "sparc64"
+archs = ["amd64"]
+name = "NetBSD-[[VER]]-[[ARCH]]"
+
+[OperatingSystems.BSD.OPNsense]
+enabled = true
+# Available editions:
+# "dvd", "nano", "serial", "vga"
+editions = ["vga"]
+# Available architectures:
+# "amd64"
+archs = ["amd64"]
+name = "OPNsense-[[VER]]-[[EDITION]]-[[ARCH]]"

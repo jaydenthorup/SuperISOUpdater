@@ -1,81 +1,97 @@
 import glob
 import logging
+import os
 import re
-from abc import ABC, abstractmethod
+from abc import ABC
 from pathlib import Path
 
-from modules.exceptions import IntegrityCheckError
-from modules.utils import download_file
+from modules.exceptions import NoMirrorsError
+from modules.ISOPath import ISOPath
+from modules.mirrors.GenericMirrorManager import GenericMirrorManager
+from modules.Version import Version
 
 
-class GenericUpdater(ABC):
+class GenericUpdater(ABC):  # noqa: B024
     """
     Abstract base class for a generic updater that manages software updates.
-
-    Attributes:
-        file_path (Path): The path to the file that needs to be updated.
     """
 
-    def __init__(self, file_path: Path, *args, **kwargs) -> None:
+    def __init__(
+        self,
+        iso_path: ISOPath,
+        mirror_mgr: GenericMirrorManager,
+        arch: str | None = None,
+        edition: str | None = None,
+        lang: str | None = None,
+        extension: str = "iso",
+        valid_archs: list[str] | None = None,
+        valid_editions: list[str] | None = None,
+        valid_langs: list[str] | None = None,
+        *args,
+        **kwargs,
+    ) -> None:
         """
         Initialize the GenericUpdater instance.
 
         Args:
-            file_path (Path): The path to the file that needs to be updated.
+            iso_path (ISOPath): The path to the ISO file that needs to be updated.
+            mirror_mgr (GenericMirrorManager): The mirror manager. This should be provided by the child class.
+            arch (str | None): The architecture for which the ISO is intended. Only useful if `valid_archs` is defined.
+            edition (str | None): The edition of the software. Only useful if `valid_editions` is defined.
+            lang (str | None): The language of the software. Only useful if `valid_langs` is defined.
+            extension (str): The file extension to use. Defaults to 'iso'.
+            valid_archs (list[str] | None): A list of valid architectures.
+            valid_editions (list[str] | None): A list of valid editions.
+            valid_langs (list[str] | None): A list of valid languages.
         """
-        self.file_path = file_path.resolve()
-        self.folder_path = file_path.parent.resolve()
 
-        self.version_splitter = "."
+        self.iso_path = iso_path
+        self.mirror_mgr = mirror_mgr
+        self.VersionClass = mirror_mgr.current_mirror.VersionClass
+        self.version_separator = mirror_mgr.current_mirror.version_separator
+        self.extension = extension
 
-        if self.has_edition():
-            logging.debug(
-                f"[GenericUpdater.__init__] {self.__class__.__name__} has edition support"
+        if edition:
+            if not valid_editions:
+                raise ValueError("The child class needs to define valid editions.")
+            if not self.iso_path.has_edition():
+                raise ValueError("Invalid name. The name needs a [[EDITION]] tag.")
+
+            if edition.lower() not in (valid_edition.lower() for valid_edition in valid_editions):
+                raise ValueError(f"Invalid edition. The available editions are: {', '.join(valid_editions)}.")
+            self.edition = next(
+                valid_edition for valid_edition in valid_editions if valid_edition.lower() == edition.lower()
             )
-            if self.edition.lower() not in (  # type: ignore
-                valid_edition.lower() for valid_edition in self.valid_editions  # type: ignore
-            ):
-                raise ValueError(
-                    f"Invalid edition. The available editions are: {', '.join(self.valid_editions)}."  # type: ignore
-                )
+        else:
+            self.edition = None
 
-        if self.has_lang():
-            logging.debug(
-                f"[GenericUpdater.__init__] {self.__class__.__name__} has language support"
-            )
-            if self.lang.lower() not in (  # type: ignore
-                valid_lang.lower() for valid_lang in self.valid_langs  # type: ignore
-            ):
-                raise ValueError(
-                    f"Invalid language. The available languages are: {', '.join(self.valid_langs)}."  # type: ignore
-                )
+        if lang:
+            if not self.iso_path.has_lang():
+                raise ValueError("Invalid name. The name needs a [[LANG]] tag.")
+            if not valid_langs:
+                raise ValueError("The child class needs to define valid languages.")
 
-        self.folder_path.mkdir(parents=True, exist_ok=True)
+            if lang.lower() not in (valid_lang.lower() for valid_lang in valid_langs):
+                raise ValueError(f"Invalid language. The available languages are: {', '.join(valid_langs)}.")
+            self.lang = next(valid_lang for valid_lang in valid_langs if valid_lang.lower() == lang.lower())
+        else:
+            self.lang = None
 
-    @abstractmethod
-    def _get_download_link(self) -> str:
-        """
-        (Protected) Get the download link for the latest version of the software.
+        if arch:
+            if not self.iso_path.has_arch():
+                raise ValueError("Invalid name. The name needs a [[ARCH]] tag.")
+            if not valid_archs:
+                raise ValueError("The child class needs to define valid architectures.")
 
-        Returns:
-            str: The download link for the latest version of the software.
+            if arch.lower() not in (valid_arch.lower() for valid_arch in valid_archs):
+                raise ValueError(f"Invalid architecture. The available architectures are: {', '.join(valid_archs)}.")
+            self.arch = next(valid_arch for valid_arch in valid_archs if valid_arch.lower() == arch.lower())
+        else:
+            self.arch = None
 
-        Raises:
-            DownloadLinkNotFoundError: If the download link is not found.
-        """
-        pass
+        os.makedirs(self.iso_path.dirname(), exist_ok=True)
 
-    @abstractmethod
-    def check_integrity(self) -> bool:
-        """
-        Check the integrity of the downloaded software.
-
-        Returns:
-            bool: True if the downloaded software is valid, otherwise False.
-        """
-        pass
-
-    def check_for_updates(self) -> bool:
+    def is_update_available(self) -> bool:
         """
         Check if there are updates available for the software.
 
@@ -83,16 +99,14 @@ class GenericUpdater(ABC):
             bool: True if updates are available, False if the local version is up to date.
         """
         if not (local_version := self._get_local_version()):
-            logging.debug(
-                f"[GenericUpdater.check_for_updates] No local version found for {self.__class__.__name__}"
-            )
+            logging.debug(f"[GenericUpdater.is_update_available] No local version found for {self.__class__.__name__}")
             return True
 
-        is_update_available = self._compare_version_numbers(
-            local_version, self._get_latest_version()
-        )
+        is_update_available = local_version < self._get_latest_version()
+
         logging.debug(
-            f"[GenericUpdater.check_for_updates] {self._version_to_str(local_version)} > {self._version_to_str(self._get_latest_version())}? {is_update_available}"
+            f"[GenericUpdater.is_update_available] {local_version} < {self._get_latest_version()}? "
+            "{is_update_available}"
         )
         return is_update_available
 
@@ -103,109 +117,73 @@ class GenericUpdater(ABC):
         Raises:
             IntegrityCheckError: If the integrity check of the downloaded file fails.
         """
-        download_link = self._get_download_link()
+        new_file = Path(
+            self.iso_path.fill_placeholders(
+                version=str(self._get_latest_version()),
+                edition=self.edition,
+                lang=self.lang,
+                arch=self.arch,
+                extension=self.extension,
+            )
+        )
 
-        # Determine the old and new file paths
-        old_file = self._get_local_file()
-        new_file = self._get_complete_normalized_file_path(absolute=True)
-
-        if not self.has_version():
-            # If the file is being replaced, back it up
-            if old_file:
-                logging.debug(
-                    f"[GenericUpdater.install_latest_version] Renaming old file: {old_file}"
-                )
-                old_file.with_suffix(".old").replace(old_file)
-
-        download_file(download_link, new_file)
-
-        # Check the integrity of the downloaded file
         try:
-            integrity_check = self.check_integrity()
-        except Exception as e:
-            # If integrity check failed, restore the old file or remove the new file
-            if self.has_version() or not old_file:
-                new_file.unlink()
-            else:
-                old_file.replace(new_file)
-            raise IntegrityCheckError(
-                "Integrity check failed: An error occurred"
-            ) from e
-
-        if not integrity_check:
-            # If integrity check failed, restore the old file or remove the new file
-            if self.has_version() or not old_file:
-                new_file.unlink()
-            else:
-                old_file.replace(new_file)
-            raise IntegrityCheckError("Integrity check failed: Hashes do not match")
+            self.mirror_mgr.attempt_download(new_file)
+        except NoMirrorsError as e:
+            new_file.unlink(missing_ok=True)
+            raise RuntimeError from e
 
         # If the installation was successful and we had a previous version installed, remove it
-        if old_file:
-            logging.debug(
-                f"[GenericUpdater.install_latest_version] Removing old file: {old_file}"
-            )
+        if (old_file := self._get_local_file()) and old_file != new_file:
+            logging.debug(f"[GenericUpdater.install_latest_version] Removing old file: {old_file}")
             old_file.unlink()
 
-    def has_version(self) -> bool:
-        """
-        Check if the updater supports different versions.
+    def _extract_version(self, check_path: Path | None) -> Version | None:
+        found_version: Version | None = None
 
-        Returns:
-            bool: True if different versions are supported, False otherwise.
-        """
-        return "[[VER]]" in str(self.file_path)
-
-    def has_edition(self) -> bool:
-        """
-        Check if the updater supports different editions.
-
-        Returns:
-            bool: True if different editions are supported, False otherwise.
-        """
-        return (
-            hasattr(self, "edition")
-            and hasattr(self, "valid_editions")
-            and "[[EDITION]]" in str(self.file_path)
+        normalized_path_without_ver = self.iso_path.basename().fill_placeholders(
+            version=None, edition=self.edition, lang=self.lang, arch=self.arch
         )
 
-    def has_lang(self) -> bool:
-        """
-        Check if the updater supports different languages.
+        version_regex: str = r"(.+)".join(re.escape(part) for part in normalized_path_without_ver.split("[[VER]]"))
+        found_version_regex = re.search(version_regex, str(check_path))
 
-        Returns:
-            bool: True if different languages are supported, False otherwise.
-        """
-        return (
-            hasattr(self, "lang")
-            and hasattr(self, "valid_langs")
-            and "[[LANG]]" in str(self.file_path)
-        )
+        if found_version_regex:
+            found_version = self.VersionClass(
+                found_version_regex.group(1),
+                self.version_separator,
+            )
 
-    def _get_local_file(self) -> Path | None:
+        return found_version
+
+    def _get_local_file(self, newest=False) -> Path | None:
         """
         Get the path of the locally stored file that matches the filename pattern.
+        Defaults to returning the oldest matching version. Passing `newest=True` will grab the newest version instead.
 
         Returns:
             str | None: The path of the locally stored file if found, None if no file exists.
         """
-        file_path = self._get_normalized_file_path(
-            absolute=True,
-            version=None,
-            edition=self.edition if self.has_edition() else None,  # type: ignore
-            lang=self.lang if self.has_lang() else None,  # type: ignore
+        file_path = self.iso_path.fill_placeholders(
+            version="*",  # Use wildcard to match any version in the local file name
+            edition=self.edition,
+            lang=self.lang,
+            arch=self.arch,
+            extension=self.extension,
         )
 
-        local_files = glob.glob(str(file_path).replace("[[VER]]", "*"))
+        local_files = sorted(
+            glob.glob(file_path),
+            key=lambda x: self._extract_version(Path(x).with_suffix("")),
+            reverse=newest,
+        )
 
         if local_files:
             return Path(local_files[0])
-        logging.debug(
-            f"[GenericUpdater._get_local_file] No local file found for {self.__class__.__name__}"
-        )
+        logging.debug(f"[GenericUpdater._get_local_file] No local file found for {self.__class__.__name__}")
         return None
 
-    def _get_local_version(self) -> list[str] | None:
+    def _get_local_version(self) -> Version | None:
         """
         Get the version of the locally stored file by extracting the version number from the filename.
 
@@ -213,175 +191,18 @@ class GenericUpdater(ABC):
             list[str] | None: A list of integers representing the version number if found,
                             None if the version cannot be determined or no local file exists.
         """
-        local_version: list[str] | None = None
+        local_file = self._get_local_file(newest=True)
 
-        local_file = self._get_local_file()
-
-        if not local_file or not self.has_version():
-            logging.debug(
-                f"[GenericUpdater._get_local_version] No local version found for {self.__class__.__name__}"
-            )
+        if not local_file:
+            logging.debug(f"[GenericUpdater._get_local_version] No local version found for {self.__class__.__name__}")
             return None
 
-        local_file_without_ext = local_file.with_suffix("")
-        normalized_path_without_ext = Path(
-            self._get_normalized_file_path(
-                absolute=True,
-                version=None,
-                edition=self.edition if self.has_edition() else None,  # type: ignore
-                lang=self.lang if self.has_lang() else None,  # type: ignore
-            )
-        ).with_suffix("")
-
-        version_regex: str = r"(.+)".join(
-            re.escape(part)
-            for part in str(normalized_path_without_ext).split("[[VER]]")
-        )
-        local_version_regex = re.search(version_regex, str(local_file_without_ext))
-
-        if local_version_regex:
-            local_version = self._str_to_version(local_version_regex.group(1))
+        local_version = self._extract_version(local_file.with_suffix(""))
 
         if not local_version:
-            logging.debug(
-                f"[GenericUpdater._get_local_version] No local version found for {self.__class__.__name__}"
-            )
+            logging.debug(f"[GenericUpdater._get_local_version] No local version found for {self.__class__.__name__}")
 
         return local_version
 
-    def _get_latest_version(self) -> list[str]:
-        """
-        Get the latest version of the software from the download page.
-
-        Returns:
-            list[str]: A list of integers representing the latest version number.
-
-        Raises:
-            VersionNotFoundError: If the latest version cannot be found on the download page.
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} has not been implemented yet."
-        )
-
-    def _get_normalized_file_path(
-        self,
-        absolute: bool,
-        version: list[str] | None = None,
-        edition: str | None = None,
-        lang: str | None = None,
-    ) -> Path:
-        """
-        Get the normalized file path with customizable version, edition, and language.
-
-        Args:
-            absolute (bool): If True, return the absolute file path. Otherwise, return the relative file path.
-            version (list[str], optional): The version as a list of version components.
-                                    If provided, it replaces '[[VER]]' in the file name.
-                                    Defaults to None.
-            edition (str, optional): The edition of the file. If provided, it replaces '[[EDITION]]' in the file name.
-                                    Defaults to None.
-            lang (str, optional): The language of the file. If provided, it replaces '[[LANG]]' in the file name.
-                                    Defaults to None.
-
-        Returns:
-            Path: The normalized file path.
-
-        Note:
-            This method replaces placeholders such as '[[VER]]', '[[EDITION]]', and '[[LANG]]' in the file name
-            with the specified version, edition, and language respectively. It also removes all spaces from the file name.
-        """
-        file_name: str = self.file_path.name
-
-        # Replace placeholders with the specified version, edition, and language
-        if version is not None and "[[VER]]" in file_name:
-            file_name = file_name.replace("[[VER]]", self._version_to_str(version))
-
-        if edition is not None and "[[EDITION]]" in file_name:
-            file_name = file_name.replace("[[EDITION]]", edition)
-
-        if lang is not None and "[[LANG]]" in file_name:
-            file_name = file_name.replace("[[LANG]]", lang)
-
-        # Remove all spaces from the file name
-        file_name = "".join(file_name.split())
-
-        # Return the absolute or relative file path based on the 'absolute' parameter
-        return self.folder_path / file_name if absolute else Path(file_name)
-
-    def _get_complete_normalized_file_path(
-        self, absolute: bool, latest: bool = True
-    ) -> Path:
-        """
-        Get the complete normalized file path with customizable version, edition, and language.
-
-        Args:
-            absolute (bool): If True, return the absolute file path. Otherwise, return the relative file path.
-            latest (bool, optional): If True, use the latest version, edition, and language to construct the file path.
-                                    If False, use the local version, edition, and language.
-                                    Defaults to True.
-
-        Returns:
-            Path: The normalized file path.
-
-        Note:
-            This method replaces placeholders such as '[[VER]]', '[[EDITION]]', and '[[LANG]]' in the file name
-            with the specified version, edition, and language respectively. It also removes all spaces from the file name.
-        """
-        return self._get_normalized_file_path(
-            absolute=absolute,
-            version=self._get_latest_version() if latest else self._get_local_version(),
-            edition=self.edition if self.has_edition() else None,  # type: ignore
-            lang=self.lang if self.has_lang() else None,  # type: ignore
-        )
-
-    def _version_to_str(self, version: list[str]) -> str:
-        """
-        Convert a list of version components to a version string.
-
-        Args:
-            version (list[str]): The version as a list of version components.
-
-        Returns:
-            str: The version as a string with components joined by the version splitter.
-        """
-        return self.version_splitter.join(str(i) for i in version)
-
-    def _str_to_version(self, version_str: str) -> list[str]:
-        """
-        Convert a version string to a list of version components.
-
-        Args:
-            version_str (str): The version as a string.
-
-        Returns:
-            list[str]: The version as a list of version components.
-        """
-        return [
-            version_number.strip()
-            for version_number in version_str.split(self.version_splitter)
-        ]
-
-    @staticmethod
-    def _compare_version_numbers(
-        old_version: list[str], new_version: list[str]
-    ) -> bool:
-        """
-        Compare version numbers to check if a new version is available.
-
-        Args:
-            old_version (list[str]): The old version as a list of version components.
-            new_version (list[str]): The new version as a list of version components.
-
-        Returns:
-            bool: True if the new version is greater than the old version, False otherwise.
-        """
-        for i in range(len(new_version)):
-            try:
-                if int(new_version[i]) > int(old_version[i]):
-                    return True
-            except ValueError:
-                if int(new_version[i], 32) > int(old_version[i], 32):
-                    return True
-            except IndexError:
-                return True
-        return False
+    def _get_latest_version(self) -> Version:
+        return self.mirror_mgr.current_mirror.version
