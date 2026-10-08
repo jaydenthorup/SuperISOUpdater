@@ -60,7 +60,7 @@ class Proxmox(GenericUpdater):
     def _get_download_link(self) -> str:
         latest_version_str = self._version_to_str(self._get_latest_version())
 
-        return f"{DOWNLOAD_PAGE_URL}/{FILE_NAME.replace('[[VER]]', latest_version_str).replace("[[EDITION]]", self.edition)}"
+        return f"{DOWNLOAD_PAGE_URL}/{FILE_NAME.replace('[[VER]]', latest_version_str).replace('[[EDITION]]', self.edition)}"
 
     def check_integrity(self) -> bool:
         sha256_url = f"{DOWNLOAD_PAGE_URL}/SHA256SUMS"
@@ -82,20 +82,14 @@ class Proxmox(GenericUpdater):
         def parse_version(href: str) -> list[str]:
             return self._str_to_version(href.split("_")[1].split(".iso")[0])
 
-        downloads_list: Tag | None = self.soup_download_page.find("pre")  # type: ignore
-        if not downloads_list:
-            raise VersionNotFoundError("We were not able to parse the download page")
-
-        download_items = downloads_list.find_all("a")
-        if not download_items:
-            raise VersionNotFoundError(
-                "We were not able to parse the list of download links"
-            )
-
+        # The ISO links are no longer inside a <pre> block; they live in the
+        # page's link cards. Search all anchors on the page instead.
         download_links: list[str] = [
             href
-            for download_link in download_items
+            for download_link in self.soup_download_page.find_all("a", href=True)
             if self.edition in (href := download_link.get("href"))
+            and href.endswith(".iso")
+            and "arm64" not in href
         ]
         if not download_links:
             raise VersionNotFoundError(
