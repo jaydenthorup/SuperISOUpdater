@@ -1,6 +1,19 @@
-# Super ISO Updater
+# Super ISO Updater (fork)
 
-Super ISO Updater is a powerful tool that provides a convenient way to check for updates and install the latest versions of various ISO files. It is specifically designed to work with a Ventoy drive and supports a wide range of ISOs.
+A fork of [JoshuaVandaele/SuperISOUpdater](https://github.com/JoshuaVandaele/SuperISOUpdater) with our own set of updaters and fixes. It checks for updates and installs the latest versions of various ISO files, designed to work with a Ventoy drive.
+
+This fork keeps the upstream project as a remote and pulls in its changes selectively. Our `main` branch carries our customizations; upstream work is merged in when it's useful rather than tracked continuously.
+
+## What's different in this fork
+
+- **11 additional Linux distro updaters**: Ventoy, MX Linux, Puppy Linux, Parrot Security, Pop!_OS, EndeavourOS, Xubuntu, Kubuntu, Lubuntu, Ubuntu MATE, and Ubuntu Budgie.
+- **Duplicate-download fix**: when a folder holds multiple versions of an ISO, the updater now picks the highest version instead of the first file alphabetically, so it stops re-downloading ISOs you already have.
+- **Version parsing fix**: version strings with repeated separators (e.g. `6...4`) no longer crash version comparison.
+- **Windows file-lock retry**: `.part` renames retry three times with a one-second gap when an antivirus or indexer briefly locks the file.
+- **Proxmox fix**: version detection updated for the redesigned download page, and the `arm64` variant is excluded from version selection.
+- **Windows 11 language support**: uses the dynamic `[[LANG]]` placeholder instead of a hardcoded language.
+- **OPNsense re-categorized** under a new `OperatingSystems.Network` section (the old location still works).
+- **CI**: a `build-exe.yml` workflow builds `sisou.exe` with PyInstaller and attaches it to each release.
 
 ## Getting Started
 
@@ -12,46 +25,25 @@ Super ISO Updater is a powerful tool that provides a convenient way to check for
 
 #### Using pip
 
-1. Open your terminal or command prompt.
-2. Install the package using the following command:
-
 ```sh
 python -m pip install sisou
 ```
 
 #### Using git
 
-1. Clone this repository locally by running
-
 ```sh
-git clone https://github.com/JoshuaVandaele/SuperISOUpdater
-```
-
-2. Navigate into the newly created directory by running
-
-```sh
+git clone https://github.com/jaydenthorup/SuperISOUpdater
 cd SuperISOUpdater
-```
-
-3. Install the module using the following command:
-
-```sh
 python -m pip install .
 ```
 
 ### Updating
-
-To update the package to the latest version, run the following command:
 
 ```sh
 python -m pip install --upgrade sisou
 ```
 
 ## Usage
-
-To use SISOU, follow these steps:
-
-### Running the script
 
 ```sh
 sisou <Ventoy Partition>
@@ -71,15 +63,13 @@ sisou /run/media/joshua/Ventoy/
 
 ### Logging
 
-The script generates logs during its execution. You can control the log level using the `-l` or `--log-level` argument when running the script. The available log levels are: DEBUG, INFO, WARNING, ERROR, and CRITICAL. By default, the log level is set to INFO.
-
-To set a specific log level, use the `-l` option followed by the desired log level:
+Control the log level with `-l` / `--log-level` (DEBUG, INFO, WARNING, ERROR, CRITICAL; default INFO):
 
 ```sh
 sisou <Ventoy Partition> -l DEBUG
 ```
 
-You can also specify a log file using the `-f` or `--log-file` argument to save the logs to a file instead of displaying them in the console:
+Save logs to a file with `-f` / `--log-file`:
 
 ```sh
 sisou <Ventoy Partition> -f /path/to/log_file.log
@@ -87,23 +77,17 @@ sisou <Ventoy Partition> -f /path/to/log_file.log
 
 ## Customization
 
-The `sisou.py` script uses a configuration file (`config.toml`) to define the ISOs to be updated. You can customize this configuration file to add or remove ISOs from the update process.
-
-To customize the ISOs, open the `config.toml` file and edit the relevant sections. Each ISO is associated with an updater class (e.g., `Ubuntu`, `MemTest86Plus`, etc.). You can enable or disable ISOs by modifying the corresponding values in the configuration file.
+The script uses a `config.toml` file to define which ISOs to update. Each ISO maps to an updater class (e.g. `Ubuntu`, `MemTest86Plus`); enable or disable ISOs by editing the relevant sections.
 
 _NOTE: Be cautious when modifying the configuration file, as incorrect changes may cause the script to malfunction._
 
-By default, the script uses the `config.toml` file located in the same directory as the Ventoy drive.
-
-You can specify a custom configuration file using the `-c` or `--config-file` argument when running the script:
+By default the script looks for `config.toml` in the same directory as the Ventoy drive. Specify a custom file with `-c` / `--config-file`:
 
 ```sh
 sisou <Ventoy Partition> -c /path/to/config.toml
 ```
 
 ## Supported ISOs
-
-The tool currently supports the following ISOs:
 
 - **Diagnostic Tools**
   - Hiren's BootCD PE
@@ -129,28 +113,47 @@ The tool currently supports the following ISOs:
     - Manjaro (editions: "plasma", "xfce", "gnome", "cinnamon", "i3")
     - OpenSUSE (editions: "leap", "leap-micro", "jump")
     - OpenSUSE Rolling (editions: "MicroOS-DVD", "Tumbleweed-DVD", "Tumbleweed-NET", "Tumbleweed-GNOME-Live", "Tumbleweed-KDE-Live", "Tumbleweed-XFCE-Live", "Tumbleweed-Rescue-CD")
-    - OPNsense (editions: "dvd", "nano", "serial", "vga")
     - Proxmox (editions: "ve", "mail-gateway", "backup-server")
     - Rocky Linux (editions: "dvd", "boot", "minimal")
     - Tails
     - ChromeOS (editions: "ltc", "ltr", "stable")
+    - **Ventoy**
+    - **MX Linux**
+    - **Puppy Linux**
+    - **Parrot Security**
+    - **Pop!_OS**
+    - **EndeavourOS**
+    - **Xubuntu**
+    - **Kubuntu**
+    - **Lubuntu**
+    - **Ubuntu MATE**
+    - **Ubuntu Budgie**
   - **Windows**
     - Windows 11 (Multi-edition ISO, Any language)
     - Windows 10 (Multi-edition ISO, Any language)
   - **BSD**
     - TrueNAS (editions: "scale", "core")
+  - **Network**
+    - OPNsense (editions: "dvd", "nano", "serial", "vga")
   - **Other**
     - FreeDOS (editions: "BonusCD", "FloppyEdition", "FullUSB", "LegacyCD", "LiteUSB", "LiveCD")
     - TempleOS (editions: "Distro", "Lite")
 
+## Keeping up with upstream
+
+This fork tracks upstream as a remote. To pull in upstream changes:
+
+```sh
+git fetch upstream
+git merge upstream/main
+```
+
+Resolve any conflicts as needed. Because upstream has moved to a different internal architecture (a mirror-based system), merging its newer work may require porting updaters rather than a clean fast-forward.
+
 ## Contribute
 
-If you have any suggestions, bug reports, or feature requests, feel free to open an issue or submit a pull request. Your contributions are highly appreciated!
+If you have suggestions, bug reports, or feature requests, open an issue or submit a pull request.
 
 ## License
 
 This project is licensed under the [GPLv3 License](./LICENSE).
-
----
-
-Thank you for using Super ISO Updater! If you encounter any issues or need assistance, please don't hesitate to reach out. Happy updating!
